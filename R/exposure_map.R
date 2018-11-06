@@ -23,8 +23,8 @@
 #'
 #' @seealso \code{\link{departure}}, \code{\link{sensitivity_map}}, \code{\link{vulnerability_map}}
 #'
-#' @importFrom raster beginCluster clusterR endCluster
-#' @importMethodsFrom raster raster
+# @importFrom raster beginCluster clusterR endCluster
+# @importMethodsFrom raster raster
 #' @export
 
 exposure_map <- function(dep, parallel = FALSE, n, filename = "", ...){
@@ -36,14 +36,14 @@ exposure_map <- function(dep, parallel = FALSE, n, filename = "", ...){
     filename <- rasterTmpFile()
   }
 
-  f1 <- function(x) x %*% d
+  f1 <- function(x) (x %*% d) #/ length(d)
 
   if(parallel) {
-    beginCluster(n, exclude = "CENFA")
-    exp.ras <- clusterR(ras, fun = .calc, args = list(fun = f1, forceapply = T, names = "Departure"), filename = filename, ...)
+    beginCluster(n)
+    exp.ras <- clusterR(ras, fun = .calc, args = list(fun = f1, forceapply = T, names = "Exposure"), filename = filename, ...)
     endCluster()
   } else {
-    exp.ras <- .calc(ras, fun = f1, forceapply = T, filename = filename, names = "Departure", ...)
+    exp.ras <- .calc(ras, fun = f1, forceapply = T, filename = filename, names = "Exposure", ...)
   }
 
   return(exp.ras)

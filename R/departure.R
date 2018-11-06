@@ -21,8 +21,8 @@
 #'   climate data
 #' @param filename character. Optional filename to save the Raster* output to
 #'   file. If this is not provided, a temporary file will be created for large \code{x}
-#' @param quiet logical. If \code{TRUE}, messages and progress bar will be
-#'   suppressed
+#' @param progress logical. If \code{TRUE}, messages and progress bar will be
+#'   printed
 #' @param parallel logical. If \code{TRUE} then multiple cores are utilized
 #' @param n numeric. Optional number of CPU cores to utilize for parallel processing
 #' @param ... Additional arguments for \code{\link[raster]{clusterR}}
@@ -67,7 +67,7 @@
 #' @export
 #' @importFrom stats sd
 #' @importFrom parallel detectCores
-#' @importFrom raster overlay crop
+# @importFrom raster overlay crop
 
 setGeneric("departure", function(x, y, s.dat, ...) {
   standardGeneric("departure")
@@ -79,6 +79,8 @@ setMethod("departure",
           function(x, s.dat, filename = '', ...){
 
             call <- sys.call(sys.parent())
+            call <- match.call(departure, call)
+
             s.dat.ras <- s.dat@weights
             ras <- x@global_difras
             ext <- extent(ras)
@@ -88,12 +90,16 @@ setMethod("departure",
             if (is.null(intersect(ext, ext.s))) stop("climate and species data do not overlap")
             if (raster::union(ext, ext.s) != ext) stop("extent of species data not contained within extent of climate data")
 
-            Rg <- x@cov
+            filename <- trim(filename)
+            if (!canProcessInMemory(ras)) {
+              if (filename == '') filename <- rasterTmpFile()
+            }
 
+            Rg <- x@cov
             nm <- names(ras)
             x.dif <- crop(ras, s.dat.ras)
-            x.dif <- mask(x.dif, s.dat.ras)
             names(x.dif) <- nm
+            x.dif <- mask(x.dif, s.dat.ras, filename = filename, ...)
             w <- s.dat.ras / (cellStats(s.dat.ras, sum, na.rm = T) - 1)
             x.dif.w <- overlay(x = x.dif, y = w, fun = function(x,y) {return(x*y)})
             d <- cellStats(x.dif.w, sum)
@@ -102,12 +108,6 @@ setMethod("departure",
                           error = function(e){
                             message("Warning: global covariance matrix not invertible. Overall departure will not be computed.")
                             return(as.numeric(NA))})
-
-            filename <- trim(filename)
-            if (!canProcessInMemory(ras)) {
-              if (filename == '') filename <- rasterTmpFile()
-              writeRaster(x.dif, filename = filename, ...)
-            }
 
             depart <- methods::new("departure", call = call, df = d, departure = D, g.cov = Rg, ras = x.dif, weights = s.dat.ras)
             return(depart)
@@ -120,6 +120,8 @@ setMethod("departure",
           function(x, s.dat, field, fun = "last", filename = '', ...){
 
             call <- sys.call(sys.parent())
+            call <- match.call(departure, call)
+
             ras <- x@global_difras
             ext <- extent(ras)
             ext.s <- extent(s.dat)
@@ -128,13 +130,18 @@ setMethod("departure",
             if (is.null(intersect(ext, ext.s))) stop("climate and species data do not overlap")
             if (raster::union(ext, ext.s) != ext) stop("extent of species data not contained within extent of climate data")
 
+            filename <- trim(filename)
+            if (!canProcessInMemory(ras)) {
+              if (filename == '') filename <- rasterTmpFile()
+            }
+
             Rg <- x@cov
             s.dat.ras <- rasterize(s.dat, ras, field = field, fun = fun)
 
             nm <- names(x)
             x.dif <- crop(ras, s.dat.ras)
-            x.dif <- mask(x.dif, s.dat.ras)
             names(x.dif) <- nm
+            x.dif <- mask(x.dif, s.dat.ras, filename = filename, ...)
             w <- s.dat.ras / (cellStats(s.dat.ras, sum, na.rm = T) - 1)
             x.dif.w <- overlay(x = x.dif, y = w, fun = function(x,y) {return(x*y)})
             d <- cellStats(x.dif.w, sum)
@@ -144,12 +151,6 @@ setMethod("departure",
                             message("Warning: global covariance matrix not invertible. Overall departure will not be computed.")
                             return(as.numeric(NA))})
 
-            filename <- trim(filename)
-            if (!canProcessInMemory(ras)) {
-              if (filename == '') filename <- rasterTmpFile()
-              writeRaster(x.dif, filename = filename, ...)
-            }
-
             depart <- methods::new("departure", call = call, df = d, departure = D, g.cov = Rg, ras = x.dif, weights = s.dat.ras)
             return(depart)
           }
@@ -158,11 +159,12 @@ setMethod("departure",
 #' @rdname departure
 setMethod("departure",
           signature(x = "Raster", y = "Raster", s.dat = "cnfa"),
-          function(x, y, s.dat, center = TRUE, scale = TRUE, filename = '', quiet = TRUE, parallel = FALSE, n = 1, ...) {
+          function(x, y, s.dat, center = TRUE, scale = TRUE, filename = '', progress = FALSE, parallel = FALSE, n = 1, ...) {
 
             call <- sys.call(sys.parent())
+            call <- match.call(departure, call)
 
-            GLdep <- GLdeparture(x, y, center = center, scale = scale, quiet = quiet, parallel = parallel, n = n)
+            GLdep <- GLdeparture(x, y, center = center, scale = scale, progress = progress, parallel = parallel, n = n)
             dep <- departure(x = GLdep, s.dat = s.dat, filename = filename, ...)
             dep@call <- call
             return(dep)
@@ -172,11 +174,12 @@ setMethod("departure",
 #' @rdname departure
 setMethod("departure",
           signature(x = "Raster", y = "Raster", s.dat = "Spatial"),
-          function(x, y, s.dat, center = TRUE, scale = TRUE, filename = '', quiet = TRUE, parallel = FALSE, n = 1, ...) {
+          function(x, y, s.dat, center = TRUE, scale = TRUE, filename = '', progress = FALSE, parallel = FALSE, n = 1, ...) {
 
             call <- sys.call(sys.parent())
+            call <- match.call(departure, call)
 
-            GLdep <- GLdeparture(x, y, center = center, scale = scale, quiet = quiet, parallel = parallel, n = n)
+            GLdep <- GLdeparture(x, y, center = center, scale = scale, progress = progress, parallel = parallel, n = n)
             dep <- departure(x = GLdep, s.dat = s.dat, filename = filename, ...)
             dep@call <- call
             return(dep)

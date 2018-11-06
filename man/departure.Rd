@@ -11,18 +11,19 @@
 \usage{
 departure(x, y, s.dat, ...)
 
-\S4method{departure}{GLdeparture,missing,cnfa}(x, s.dat, filename = "", ...)
+\S4method{departure}{GLdeparture,missing,cnfa}(x, s.dat, filename = "",
+  ...)
 
 \S4method{departure}{GLdeparture,missing,Spatial}(x, s.dat, field,
   fun = "last", filename = "", ...)
 
 \S4method{departure}{Raster,Raster,cnfa}(x, y, s.dat, center = TRUE,
-  scale = TRUE, filename = "", quiet = TRUE, parallel = FALSE, n = 1,
-  ...)
+  scale = TRUE, filename = "", progress = FALSE, parallel = FALSE,
+  n = 1, ...)
 
 \S4method{departure}{Raster,Raster,Spatial}(x, y, s.dat, center = TRUE,
-  scale = TRUE, filename = "", quiet = TRUE, parallel = FALSE, n = 1,
-  ...)
+  scale = TRUE, filename = "", progress = FALSE, parallel = FALSE,
+  n = 1, ...)
 }
 \arguments{
 \item{x}{Raster* object, typically a brick or stack of historical climate
@@ -53,8 +54,8 @@ climate data}
 \code{y} will be scaled by the sds of the historical
 climate data}
 
-\item{quiet}{logical. If \code{TRUE}, messages and progress bar will be
-suppressed}
+\item{progress}{logical. If \code{TRUE}, messages and progress bar will be
+printed}
 
 \item{parallel}{logical. If \code{TRUE} then multiple cores are utilized}
 

@@ -20,8 +20,8 @@
 #' @importFrom grDevices chull
 #' @importFrom magrittr %>%
 #' @importFrom stats ecdf sd
-#' @importFrom graphics abline arrows legend par points polygon text
-#' @importFrom raster quantile
+#' @importFrom graphics abline arrows legend par points polygon
+# @importFrom raster quantile
 #'
 #' @include CENFA.R cnfa-class.R enfa-class.R GLcenfa-class.R
 #'
@@ -79,14 +79,14 @@ setMethod("scatter",
     s.ch <- chull(s.in)
   } else stop("p must be in the range [0, 1]")
 
-  xmin <- min(g.in[ ,1], s.in[ ,1])
-  xmax <- max(g.in[ ,1], s.in[ ,1])
+  xmin <- min(g.in[ ,1], s.in[ ,1], co[ ,1])
+  xmax <- max(g.in[ ,1], s.in[ ,1], co[ ,1])
   xfact <- xmax - xmin
   xmin <- xmin - xfact*.1
   xmax <- xmax + xfact*.1
 
-  ymin <- min(g.in[ ,2], s.in[ ,2])
-  ymax <- max(g.in[ ,2], s.in[ ,2])
+  ymin <- min(g.in[ ,2], s.in[ ,2], co[ ,2])
+  ymax <- max(g.in[ ,2], s.in[ ,2], co[ ,2])
   yfact <- ymax - ymin
   ymin <- ymin - yfact*.1
   ymax <- ymax + yfact*.1
@@ -166,12 +166,16 @@ setMethod("scatter",
   xmin <- min(g.in[ ,1], s.in[ ,1])
   xmax <- max(g.in[ ,1], s.in[ ,1])
   xfact <- xmax - xmin
+  xmin <- min(g.in[ ,1], s.in[ ,1], co[ ,1] * xfact)
+  xmax <- max(g.in[ ,1], s.in[ ,1], co[ ,1] * xfact)
   xmin <- xmin - xfact*.1
   xmax <- xmax + xfact*.1
 
   ymin <- min(g.in[ ,2], s.in[ ,2])
   ymax <- max(g.in[ ,2], s.in[ ,2])
   yfact <- ymax - ymin
+  ymin <- min(g.in[ ,2], s.in[ ,2], co[ ,2] * yfact)
+  ymax <- max(g.in[ ,2], s.in[ ,2], co[ ,2] * yfact)
   ymin <- ymin - yfact*.1
   ymax <- ymax + yfact*.1
 
@@ -206,7 +210,7 @@ setMethod("scatter",
   p[x < 0] <- -p[x < 0]
   q <- rep(yfact/40, length(y))
   q[y < 0] <- -q[y < 0]
-  text(x * xfact + p, y * yfact + q, ...)
+  graphics::text(x * xfact + p, y * yfact + q, ...)
 }
 
 #' @keywords internal

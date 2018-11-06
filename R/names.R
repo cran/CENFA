@@ -16,9 +16,9 @@
 #' @name names
 #'
 #' @importFrom methods .hasSlot
-#' @importFrom raster nlayers
-#' @importClassesFrom raster RasterLayer RasterStack
-#' @importMethodsFrom raster raster
+# @importFrom raster nlayers
+# @importClassesFrom raster RasterLayer RasterStack
+# @importMethodsFrom raster raster
 NULL
 
 #' @rdname names

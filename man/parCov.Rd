@@ -10,10 +10,11 @@
 parCov(x, y, ...)
 
 \S4method{parCov}{Raster,missing}(x, w = NULL, sample = TRUE,
-  quiet = TRUE, parallel = FALSE, n = 1)
+  progress = FALSE, parallel = FALSE, n = 1, cl = NULL,
+  keep.open = FALSE)
 
 \S4method{parCov}{Raster,Raster}(x, y, w = NULL, sample = TRUE,
-  quiet = TRUE, parallel = FALSE, n = 1)
+  progress = FALSE, parallel = FALSE, n = 1, cl, keep.open = FALSE)
 }
 \arguments{
 \item{x}{Raster* object, typically a brick or stack}
@@ -28,12 +29,17 @@ as \code{x}}
 \item{sample}{logical. If \code{TRUE}, the sample covariance is calculated
 with a denominator of $n-1$}
 
-\item{quiet}{logical. If \code{TRUE}, messages and progress bar will be
-suppressed}
+\item{progress}{logical. If \code{TRUE}, messages and progress bar will be
+printed}
 
 \item{parallel}{logical. If \code{TRUE} then multiple cores are utilized}
 
 \item{n}{numeric. Number of CPU cores to utilize for parallel processing}
+
+\item{cl}{optional cluster object}
+
+\item{keep.open}{logical. If \code{TRUE} and \code{parallel = TRUE}, the
+cluster object will not be closed after the function has finished}
 }
 \value{
 Returns a matrix with the same row and column names as the layers of

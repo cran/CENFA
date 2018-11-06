@@ -13,37 +13,46 @@
 \usage{
 enfa(x, s.dat, ...)
 
-\S4method{enfa}{GLcenfa,Raster}(x, s.dat, filename = "", quiet = TRUE,
-  parallel = FALSE, n = 1, ...)
+\S4method{enfa}{GLcenfa,Raster}(x, s.dat, filename = "",
+  progress = FALSE, parallel = FALSE, n = 1, cl = NULL,
+  keep.open = FALSE, ...)
 
 \S4method{enfa}{GLcenfa,Spatial}(x, s.dat, field, fun = "last",
-  filename = "", quiet = TRUE, parallel = FALSE, n = 1, ...)
+  filename = "", progress = FALSE, parallel = FALSE, n = 1,
+  cl = NULL, keep.open = FALSE, ...)
 
 \S4method{enfa}{Raster,Raster}(x, s.dat, scale = TRUE, filename = "",
-  quiet = TRUE, parallel = FALSE, n = 1, ...)
+  progress = FALSE, parallel = FALSE, n = 1, cl = NULL,
+  keep.open = FALSE, ...)
 
-\S4method{enfa}{Raster,Spatial}(x, s.dat, field, fun = "last", scale = TRUE,
-  filename = "", quiet = TRUE, parallel = FALSE, n = 1, ...)
+\S4method{enfa}{Raster,Spatial}(x, s.dat, field, fun = "last",
+  scale = TRUE, filename = "", progress = FALSE, parallel = FALSE,
+  n = 1, cl = NULL, keep.open = FALSE, ...)
 }
 \arguments{
 \item{x}{Raster* object, typically a brick or stack of ecological raster layers,
 or a \code{GLcenfa} object}
 
 \item{s.dat}{RasterLayer, SpatialPolygons*, or SpatialPoints* object indicating
-species presence}
+species presence or abundance}
 
 \item{...}{Additional arguments for \code{\link[raster]{writeRaster}}}
 
 \item{filename}{character. Optional filename to save the Raster* output to
 file. If this is not provided, a temporary file will be created for large \code{x}}
 
-\item{quiet}{logical. If \code{TRUE}, messages and progress bar will be
-suppressed}
+\item{progress}{logical. If \code{TRUE}, messages and progress bar will be
+printed}
 
 \item{parallel}{logical. If \code{TRUE} then multiple cores are utilized for the
 calculation of the covariance matrices}
 
 \item{n}{numeric. Number of CPU cores to utilize for parallel processing}
+
+\item{cl}{optional cluster object}
+
+\item{keep.open}{logical. If \code{TRUE} and \code{parallel = TRUE}, the
+cluster object will not be closed after the function has finished}
 
 \item{field}{field of \code{s.dat} that specifies presence or abundance. This
 is equivalent to the \code{field} argument in the \code{raster} package}
@@ -70,10 +79,10 @@ Returns an S4 object of class \code{enfa} with the following components:
   \item{sf}{Specialization factor. Vector of eigenvalues of specialization}
   \item{specialization}{Overall specialization, equal to the square root of the sum
   of eigenvalues, divided by the length of \code{sf}}
-  \item{s.prop}{Vector representing the amount of specialization found in each
-   ENFA factor}
+  \item{sf.prop}{Vector representing the proportion of specialization found in each
+  ENFA factor}
   \item{co}{A matrix describing the amount of marginality and specialization
-   on each ENFA factor. (The marginality column is normalized)}
+   on each ENFA factor}
   \item{ras}{RasterBrick of transformed climate values, with p layers}
   \item{weights}{Raster layer of weights used for ENFA calculation}
 }
@@ -90,7 +99,7 @@ function in the \code{adehabitatHS} package. \code{CENFA::enfa} will give
 different results than \code{adehabitatHS::enfa} for versions of \code{adehabitatHS}
 0.3.13 or earlier, however, for two primary reasons.
 
-First, \code{CENFA::enfa} corrects a critical mistake in the calculation of
+First, \code{CENFA::enfa} corrects a minor mistake in the calculation of
 the species covariance matrix. This correction influences the values of the
 coefficients of specialization in each ecological variable, which will lead to
 a different interpretation of the degree of specialization. Second, we define

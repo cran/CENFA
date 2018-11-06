@@ -8,11 +8,13 @@
 \alias{GLcenfa,Raster-method}
 \title{Climate-niche factor analysis for reference study area}
 \usage{
-GLcenfa(x, center = TRUE, scale = TRUE, filename = "", quiet = TRUE,
-  parallel = FALSE, n = 1, ...)
+GLcenfa(x, center = TRUE, scale = TRUE, filename = "",
+  progress = FALSE, parallel = FALSE, n = 1, cl = NULL,
+  keep.open = FALSE, ...)
 
-\S4method{GLcenfa}{Raster}(x, center = TRUE, scale = TRUE, filename = "",
-  quiet = TRUE, parallel = FALSE, n = 1, ...)
+\S4method{GLcenfa}{Raster}(x, center = TRUE, scale = TRUE,
+  filename = "", progress = FALSE, parallel = FALSE, n = 1,
+  cl = NULL, keep.open = FALSE, ...)
 }
 \arguments{
 \item{x}{Raster* object, typically a brick or stack of p environmental raster
@@ -35,12 +37,17 @@ value. Scaling is done after centering}
 to file. If this is not provided, a temporary file will be created for large
 \code{x}}
 
-\item{quiet}{logical. If \code{TRUE}, messages and progress bar will be
-suppressed}
+\item{progress}{logical. If \code{TRUE}, messages and progress bar will be
+printed}
 
 \item{parallel}{logical. If \code{TRUE} then multiple cores are utilized}
 
 \item{n}{numeric. Number of CPU cores to utilize for parallel processing}
+
+\item{cl}{optional cluster object}
+
+\item{keep.open}{logical. If \code{TRUE} and \code{parallel = TRUE}, the
+cluster object will not be closed after the function has finished}
 
 \item{...}{Additional arguments for \code{\link[raster]{writeRaster}}}
 }

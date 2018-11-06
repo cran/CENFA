@@ -10,17 +10,13 @@
 \alias{sensitivity}
 \alias{cov}
 \alias{raster}
-\alias{m.factor}
-\alias{s.factor}
-\alias{marginality}
-\alias{specialization}
-\alias{sensitivity}
 \alias{cov.cnfa}
 \alias{cov.enfa}
 \alias{cov.GLcenfa}
 \alias{raster,enfa-method}
 \alias{raster,cnfa-method}
 \alias{raster,GLcenfa-method}
+\alias{raster,GLdeparture-method}
 \alias{names,GLcenfa-method}
 \alias{names,GLdeparture-method}
 \alias{names,cnfa-method}
@@ -49,6 +45,8 @@ cov.GLcenfa(x)
 \S4method{raster}{cnfa}(x)
 
 \S4method{raster}{GLcenfa}(x)
+
+\S4method{raster}{GLdeparture}(x)
 
 \S4method{names}{GLcenfa}(x)
 

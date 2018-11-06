@@ -5,8 +5,8 @@ knitr::opts_chunk$set(
   fig.width = 6,
   fig.height = 4
 )
-library(raster)
-library(sp)
+# library(raster)
+# library(sp)
 library(CENFA)
 
 ## ----QUGA-plot, echo=FALSE-----------------------------------------------

@@ -8,7 +8,7 @@
 #' @param x Raster* object, typically a brick or stack with p climate
 #'   raster layers, or a \code{GLcenfa} object
 #' @param s.dat RasterLayer, SpatialPolygons*, or SpatialPoints* object indicating
-#'   species presence
+#'   species presence or abundance
 #' @param field field of \code{s.dat} that specifies presence or abundance. This
 #'   is equivalent to the \code{field} argument in \code{\link[raster]{rasterize}}
 #' @param fun function or character. Determines what values to assign to cells
@@ -22,11 +22,14 @@
 #'   scaled beforehand using the \code{\link{GLcenfa}} function
 #' @param filename character. Optional filename to save the Raster* output to
 #'   file. If this is not provided, a temporary file will be created for large \code{x}
-#' @param quiet logical. If \code{TRUE}, messages and progress bar will be
-#'   suppressed
+#' @param progress logical. If \code{TRUE}, messages and progress bar will be
+#'   printed
 #' @param parallel logical. If \code{TRUE} then multiple cores are utilized for the
 #'   calculation of the covariance matrices
 #' @param n numeric. Number of CPU cores to utilize for parallel processing
+#' @param cl optional cluster object
+#' @param keep.open logical. If \code{TRUE} and \code{parallel = TRUE}, the
+#'   cluster object will not be closed after the function has finished
 #' @param ... Additional arguments for \code{\link[raster]{writeRaster}}
 #'
 #' @examples
@@ -53,10 +56,9 @@
 #'    sensitivity for each climate variable}
 #'   \item{sensitivity}{Magnitude of the sensitivity factor, scaled by the
 #'   global covariance matrix}
-#'   \item{s.prop}{Vector of length p representing the amount of specialization
-#'   found in each CNFA factor}
+#'   \item{eig}{Named vector of eigenvalues of specialization for each CNFA factor}
 #'   \item{co}{A p x p matrix describing the amount of marginality and specialization
-#'    on each CNFA factor. (The marginality column is normalized)}
+#'    in each CNFA factor.}
 #'   \item{cov}{p x p species covariance matrix}
 #'   \item{g.cov}{p x p global covariance matrix}
 #'   \item{ras}{RasterBrick of transformed climate values, with p layers}
@@ -81,8 +83,8 @@
 #' measure of specialization than ENFA's specialization factor, which does
 #' not calculate the amount of specialization found in the marginality factor.
 #' As such, CNFA's overall sensitivity (found in the slot \code{sensitivity})
-#' is likely more meaningful than ENFA's overall specialization (found in the
-#' slot \code{specialization}).
+#' offers a more complete measure of niche specialization than ENFA's overall
+#' specialization (found in the slot \code{specialization}).
 #'
 #' The default \code{fun = 'last'} gives equal weight to each occupied cell.
 #' If multiple species observations occur in the same cell, the cell will only
@@ -108,8 +110,8 @@
 #' @name cnfa
 #'
 #' @importFrom stats cov
-#' @importFrom methods as
-#' @importFrom raster rasterTmpFile intersect extent values mask crop values<-
+#' @importFrom methods as is
+# @importFrom raster rasterTmpFile intersect extent values mask crop values<-
 
 setGeneric("cnfa", function(x, s.dat, ...){
   standardGeneric("cnfa")})
@@ -117,9 +119,21 @@ setGeneric("cnfa", function(x, s.dat, ...){
 #' @rdname cnfa
 setMethod("cnfa",
           signature(x = "GLcenfa", s.dat = "Raster"),
-          function(x, s.dat, filename = "", quiet = TRUE, parallel = FALSE, n = 1, ...){
+          function(x, s.dat, filename = "", progress = FALSE, parallel = FALSE, n = 1, cl = NULL, keep.open = FALSE, ...){
 
             call <- sys.call(sys.parent())
+            call <- match.call(cnfa, call)
+
+            if(file.exists(filename)) {
+              params <- list(...)
+              if(length(params) > 0) {
+                if(is.null(params$overwrite)) {
+                  stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+                } else if(!(params$overwrite)) {
+                  stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+                }
+              } else stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+            }
 
             if (nlayers(s.dat) > 1) stop('"s.dat" should be a single RasterLayer')
             if (!identicalCRS(raster(x), s.dat)) stop("climate and species projections do not match")
@@ -136,7 +150,7 @@ setMethod("cnfa",
               filename <- rasterTmpFile()
             }
 
-            if (canProcessInMemory(x.crop) & !parallel) {
+            if (canProcessInMemory(x.crop) && !parallel) {
               pres <- which(!is.na(values(s.dat)) & !is.na(values(max(x.crop))))
               S <- values(x.crop)[pres, ]
               nS <- nrow(S)
@@ -144,7 +158,7 @@ setMethod("cnfa",
               p <- values(s.dat)[pres]
               p.sum <- sum(p)
               mar <- apply(S, 2, function(x) sum(x * p)) / p.sum
-              if (!quiet) cat("Calculating species covariance matrix...\n")
+              if (progress) cat("Calculating species covariance matrix...\n")
               Sm <- sweep(S, 2, mar)
               DpSm <- apply(Sm, 2, function(x) x * p)
               Rs <- crossprod(Sm, DpSm) * 1 / (p.sum - 1)
@@ -154,16 +168,22 @@ setMethod("cnfa",
               p.sum <- cellStats(s.dat, sum)
               DpS <- x.mask * s.dat
               mar <- cellStats(DpS, sum) / p.sum
-              if (!quiet) cat("Calculating species covariance matrix...\n")
-              Sm <- parScale(x.mask, center = mar, scale = F, parallel = parallel, n = n, quiet = T)
-              Rs <- parCov(x = Sm, w = s.dat, parallel = parallel, n = n, quiet = quiet)
+              if (progress) cat("Calculating species covariance matrix...\n")
+              if (parallel) {
+                if (!keep.open) on.exit(closeAllConnections())
+                if (missing(cl) && n > 1) cl <- snow::makeCluster(getOption("cl.cores", n))
+              }
+              Sm <- parScale(x.mask, center = mar, scale = F, parallel = parallel, n = n, progress = F, keep.open = keep.open, cl = cl)
+              Rs <- parCov(x = Sm, w = s.dat, parallel = parallel, n = n, progress = progress, keep.open = keep.open, cl = cl)
             }
 
             cZ <- nlayers(ras)
             m <- sqrt(as.numeric(t(mar) %*% mar))
             if (max(Im(eigen(Rs)$values)) > 1e-05) stop("complex eigenvalues. Try removing correlated variables.")
             eigRs <- lapply(eigen(Rs), Re)
-            Rs12 <- eigRs$vectors %*% diag(eigRs$values^(-0.5)) %*% t(eigRs$vectors)
+            keep <- (eigRs$values > 1e-09)
+            Rs12 <- eigRs$vectors[, keep] %*% diag(eigRs$values[keep]^(-0.5)) %*% t(eigRs$vectors[, keep])
+            #Rs12 <- eigRs$vectors %*% diag(eigRs$values^(-0.5)) %*% t(eigRs$vectors)
             W <- Rs12 %*% Rg %*% Rs12
             z <- Rs12 %*% mar
             y <- z/sqrt(sum(z^2))
@@ -171,40 +191,61 @@ setMethod("cnfa",
             s <- Re(eigen(H)$values)[-cZ]
             s.p <- (t(mar) %*% Rg %*% mar) / (t(mar) %*% Rs %*% mar)
             s <- c(s.p, s)
-            s.p <- abs(s) / sum(abs(s))
+            #s.p <- abs(s) / sum(abs(s))
             v <- Re(eigen(H)$vectors)
-            co <- matrix(nrow = cZ, ncol = cZ)
+            U <- matrix(nrow = cZ, ncol = cZ)
             u <- as.matrix((Rs12 %*% v)[, 1:(cZ-1)])
             norw <- sqrt(diag(t(u) %*% u))
-            co[, -1] <- sweep(u, 2, norw, "/")
-            co[, 1] <- mar / m
-            sf <- sqrt(as.numeric(abs(co) %*% s))
-            sens <- sqrt(as.numeric(t(sf) %*% sf)/cZ)
+            U[, -1] <- sweep(u, 2, norw, "/")
+            #co[, 1] <- mar / m
+            U[, 1] <- mar
+            V <- sweep(abs(U), 2, colSums(abs(U)), "/")
+            sf <- as.numeric(V %*% s)
+            #sens <- sqrt(as.numeric(t(sf) %*% sf)/cZ)
+            sens <- sqrt(mean(sf))
             nm <- c("Marg", paste0("Spec", (1:(cZ-1))))
             if (canProcessInMemory(x.crop) & !parallel){
               s.ras <- brick(x.crop)
-              if (!quiet) cat("Creating factor rasters...")
-              values(s.ras)[pres, ] <- S %*% co
+              if (progress) cat("Creating factor rasters...")
+              values(s.ras)[pres, ] <- S %*% U
               names(s.ras) <- nm
             } else {
-              if (!quiet) cat("Creating factor rasters...")
-              s.ras <- .calc(x.mask, function(x) {x %*% co}, forceapply = T, filename = filename, names = nm, ...)
+              if (progress) cat("Creating factor rasters...")
+              f1 <- function(x) x %*% U
+              if(parallel) {
+                s.ras <- clusterR(x.mask, fun = .calc, args = list(fun = f1, forceapply = T, names = nm), cl = cl, filename = filename, ...)
+              } else {
+                s.ras <- .calc(x.mask, fun = f1, forceapply = T, filename = filename, names = nm, ...)
+              }
             }
-            colnames(co) <- names(s.p) <- nm
-            rownames(co) <- names(sf) <- names(ras)
+            colnames(U) <- names(s) <- nm
+            rownames(U) <- names(sf) <- names(mar) <- names(ras)
+            if (!keep.open || missing(cl)) snow::stopCluster(cl)
 
-            cnfa <- methods::new("cnfa", call = call, mf = mar, marginality = m, sf = sf,
-                                 sensitivity = sens, p.spec = s.p, co = co, cov = Rs, g.cov = Rg, ras = s.ras, weights = s.dat)
-            return(cnfa)
+            mod <- methods::new("cnfa", call = call, mf = mar, marginality = m, sf = sf,
+                                 sensitivity = sens, eig = s, co = U, cov = Rs, g.cov = Rg, ras = s.ras, weights = s.dat)
+            return(mod)
           }
 )
 
 #' @rdname cnfa
 setMethod("cnfa",
           signature(x = "GLcenfa", s.dat = "Spatial"),
-          function(x, s.dat, field, fun = "last", filename = "", quiet = TRUE, parallel = FALSE, n = 1, ...){
+          function(x, s.dat, field, fun = "last", filename = "", progress = FALSE, parallel = FALSE, n = 1, cl = NULL, keep.open = FALSE, ...){
 
             call <- sys.call(sys.parent())
+            call <- match.call(cnfa, call)
+
+            if(file.exists(filename)) {
+              params <- list(...)
+              if(length(params) > 0) {
+                if(is.null(params$overwrite)) {
+                  stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+                } else if(!(params$overwrite)) {
+                  stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+                }
+              } else stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+            }
 
             if (! inherits(s.dat, c('SpatialPolygons', 'SpatialPoints'))) stop('"s.dat" should be a "SpatialPolygons*" or "SpatialPoints*" object')
             if (!identicalCRS(raster(x), s.dat)) stop("climate and species projections do not match")
@@ -217,16 +258,30 @@ setMethod("cnfa",
             x.crop <- crop(ras, ext.s)
             s.dat.ras <- rasterize(s.dat, x.crop, field = field, fun = fun)
 
-            cnfa(x = x, s.dat = s.dat.ras, filename = filename, quiet = quiet, parallel = parallel, n = n, ...)
+            mod <- cnfa(x = x, s.dat = s.dat.ras, filename = filename, progress = progress, parallel = parallel, n = n, cl = cl, keep.open = keep.open, ...)
+            mod@call <- call
+            return(mod)
           }
 )
 
 #' @rdname cnfa
 setMethod("cnfa",
           signature(x = "Raster", s.dat = "Raster"),
-          function(x, s.dat, scale = TRUE, filename = "", quiet = TRUE, parallel = FALSE, n = 1, ...){
+          function(x, s.dat, scale = TRUE, filename = "", progress = FALSE, parallel = FALSE, n = 1, cl = NULL, keep.open = keep.open, ...){
 
             call <- sys.call(sys.parent())
+            call <- match.call(cnfa, call)
+
+            if(file.exists(filename)) {
+              params <- list(...)
+              if(length(params) > 0) {
+                if(is.null(params$overwrite)) {
+                  stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+                } else if(!(params$overwrite)) {
+                  stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+                }
+              } else stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+            }
 
             if (nlayers(s.dat) > 1) stop('"s.dat" should be a single RasterLayer')
             if(!identicalCRS(x, s.dat)) stop("projections do not match")
@@ -234,21 +289,35 @@ setMethod("cnfa",
             if(raster::union(extent(x), extent(s.dat)) != extent(x)) stop("extent of species data not contained within extent of climate data")
 
             if (scale) {
-              if (!quiet) cat("Scaling raster data...\n")
-              #x <- parScale(x, center = T, scale = T, parallel = parallel, n = n, quiet = quiet)
-              x <- GLcenfa(x = x, center = T, scale = T, quiet = quiet, parallel = parallel, n = n)
-            } else x <- GLcenfa(x = x, center = F, scale = F, quiet = quiet, parallel = parallel, n = n)
+              if (progress) cat("Scaling raster data...\n")
+              #x <- parScale(x, center = T, scale = T, parallel = parallel, n = n, progress = progress)
+              x <- GLcenfa(x = x, center = T, scale = T, progress = progress, parallel = parallel, n = n, cl = cl, keep.open = keep.open)
+            } else x <- GLcenfa(x = x, center = F, scale = F, progress = progress, parallel = parallel, n = n, cl = cl, keep.open = keep.open)
 
-            cnfa(x = x, s.dat = s.dat, filename = filename, quiet = quiet, parallel = parallel, n = n, ...)
+            mod <- cnfa(x = x, s.dat = s.dat, filename = filename, progress = progress, parallel = parallel, n = n, cl = cl, keep.open = keep.open, ...)
+            mod@call <- call
+            return(mod)
           }
 )
 
 #' @rdname cnfa
 setMethod("cnfa",
           signature(x = "Raster", s.dat = "Spatial"),
-          function(x, s.dat, field, fun = "last", scale = TRUE, filename = "", quiet = TRUE, parallel = FALSE, n = 1, ...){
+          function(x, s.dat, field, fun = "last", scale = TRUE, filename = "", progress = FALSE, parallel = FALSE, n = 1, cl = NULL, keep.open = FALSE, ...){
 
             call <- sys.call(sys.parent())
+            call <- match.call(cnfa, call)
+
+            if(file.exists(filename)) {
+              params <- list(...)
+              if(length(params) > 0) {
+                if(is.null(params$overwrite)) {
+                  stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+                } else if(!(params$overwrite)) {
+                  stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+                }
+              } else stop(paste0(filename, " exists. use 'overwrite=TRUE' if you want to overwrite it"))
+            }
 
             if (! inherits(s.dat, c('SpatialPolygons', 'SpatialPoints'))) stop('"s.dat" should be a "SpatialPolygons*" or "SpatialPoints*" object')
             if(!identicalCRS(x, s.dat)) stop("projections do not match")
@@ -257,17 +326,18 @@ setMethod("cnfa",
 
             s.dat.ras <- rasterize(s.dat, raster(x), field = field, fun = fun)
             if (scale) {
-              if (!quiet) cat("Scaling raster data...\n")
-              x <- GLcenfa(x = x, center = T, scale = T, quiet = quiet, parallel = parallel, n = n)
-            } else x <- GLcenfa(x = x, center = F, scale = F, quiet = quiet, parallel = parallel, n = n)
+              x <- GLcenfa(x = x, center = T, scale = T, progress = progress, parallel = parallel, n = n, cl = cl, keep.open = keep.open)
+            } else x <- GLcenfa(x = x, center = F, scale = F, progress = progress, parallel = parallel, n = n, cl = cl, keep.open = keep.open)
 
-            cnfa(x = x, s.dat = s.dat.ras, filename = filename, quiet = quiet, parallel = parallel, n = n, ...)
+            mod <- cnfa(x = x, s.dat = s.dat.ras, filename = filename, progress = progress, parallel = parallel, n = n, cl = cl, keep.open = keep.open, ...)
+            mod@call <- call
+            return(mod)
           }
 )
 
 # setMethod("cnfa",
 #           signature(x = "Raster", s.dat = "sf"),
-#           function(x, s.dat, field, fun = "last", scale = TRUE, filename = "", quiet = TRUE, parallel = FALSE, n = 1, ...){
+#           function(x, s.dat, field, fun = "last", scale = TRUE, filename = "", progress = FALSE, parallel = FALSE, n = 1, ...){
 #             if (!requireNamespace("sf")) {
 #               warning('cannot do this because sf is not available')
 #             }
@@ -283,10 +353,10 @@ setMethod("cnfa",
 #
 #             s.dat.ras <- rasterize(s.dat, raster(x), field = field, fun = fun)
 #             if (scale) {
-#               if (!quiet) cat("Scaling raster data...\n")
-#               x <- GLcenfa(x = x, center = T, scale = T, quiet = quiet, parallel = parallel, n = n)
-#             } else x <- GLcenfa(x = x, center = F, scale = F, quiet = quiet, parallel = parallel, n = n)
+#               if (progress) cat("Scaling raster data...\n")
+#               x <- GLcenfa(x = x, center = T, scale = T, progress = progress, parallel = parallel, n = n)
+#             } else x <- GLcenfa(x = x, center = F, scale = F, progress = progress, parallel = parallel, n = n)
 #
-#             cnfa(x = x, s.dat = s.dat.ras, filename = filename, quiet = quiet, parallel = parallel, n = n, ...)
+#             cnfa(x = x, s.dat = s.dat.ras, filename = filename, progress = progress, parallel = parallel, n = n, ...)
 #           }
 # )
