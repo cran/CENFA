@@ -18,13 +18,13 @@
   \item{PDQ}{precip of driest quarter}
 }}
 \source{
-\url{www.worldclim.org}
+\url{https://www.worldclim.org}
 }
 \usage{
 climdat.fut
 }
 \description{
-Future climate dataset of 10 bioclimate variables (\url{www.worldclim.org}).
+Future climate dataset of 10 bioclimate variables (\url{https://www.worldclim.org}).
 Based on the MIROC5 GCM projections under the RCP8.5 scenario for 2050.
 }
 \seealso{
