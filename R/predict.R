@@ -13,6 +13,8 @@
 #'
 #' @include CENFA.R vulnerability-class.R
 #' @name predict
+#' @return Returns a RasterLayer of sensitivity, departure, or vulnerability predictions,
+#' depending on the class of object.
 NULL
 
 #' @rdname predict
@@ -92,13 +94,13 @@ setMethod("predict",
               filename <- rasterTmpFile()
             }
 
-            f1 <- function(x) x %*% U
+            f1 <- function(y) y %*% U
             if(parallel) {
               beginCluster(n)
-              ras <- clusterR(x, fun = .calc, args = list(fun = f1, forceapply = T, names = nm), filename = filename, ...)
+              ras <- clusterR(x, fun = .calc, args = list(fun = f1, forceapply = T, names = "Sensitivity"), filename = filename, ...)
               endCluster()
             } else {
-              ras <- .calc(x, fun = f1, forceapply = T, filename = filename, names = nm, ...)
+              ras <- .calc(x, fun = f1, forceapply = T, filename = filename, names = "Sensitivity", ...)
             }
 
             return(ras)

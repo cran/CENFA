@@ -8,6 +8,7 @@ knitr::opts_chunk$set(
 # library(raster)
 # library(sp)
 library(CENFA)
+oldpar <- par(no.readonly = TRUE)
 
 ## ----QUGA-plot, echo=FALSE----------------------------------------------------
 par(mar = c(1, 1, 1, 1))
@@ -28,8 +29,8 @@ scatter(x = mod.enfa, y = glc)
 #  # does not enable parallelization
 #  mod <- enfa(x = climdat.hist, s.dat = QUGA, field = "CODE", parallel = TRUE)
 #  
-#  # enables parallelization across 4 cores
-#  mod <- enfa(x = climdat.hist, s.dat = QUGA, field = "CODE", parallel = TRUE, n = 4)
+#  # enables parallelization across 2 cores
+#  mod <- enfa(x = climdat.hist, s.dat = QUGA, field = "CODE", parallel = TRUE, n = 2)
 
 ## ----cnfa---------------------------------------------------------------------
 mod.cnfa <- cnfa(x = climdat.hist, s.dat = QUGA, field = "CODE")
@@ -86,4 +87,7 @@ par(mfrow = c(1, 3), oma = c(1,1,1,1))
 stretchPlot(sm, main = "linear")
 stretchPlot(sm, type = "hist.equal", main = "Histogram equalization")
 stretchPlot(sm, type = "sd", n = 2, main = "Standard deviation (n = 2)")
+
+## ---- echo = FALSE, message=FALSE---------------------------------------------
+par(oldpar)
 
